@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+data/KITTI/
+checkpoints/
+*.onnx
+.DS_Store
+build/
+*.egg-info/
+dist/
+.pytest_cache/
+inference/cpp/build/
+*.log

@@ -1,0 +1,77 @@
+# PointPillars Configuration for KITTI Dataset
+
+voxelization:
+  voxel_size: [0.16, 0.16, 4.0]        # [x, y, z] meters per voxel cell
+  point_cloud_range: [0, -39.68, -3, 69.12, 39.68, 1]  # [x_min, y_min, z_min, x_max, y_max, z_max]
+  max_points_per_voxel: 100             # P: max points per pillar
+  max_voxels: 12000                     # max number of non-empty pillars
+
+model:
+  num_classes: 3                        # Car, Pedestrian, Cyclist
+  in_channels: 9                        # x, y, z, intensity, x_c, y_c, z_c, x_p, y_p
+  pillar_feat_channels: [64]            # PillarFeatureNet output channels
+  backbone_out_channels: [64, 128, 256]  # Downsample block output channels
+  fpn_upsample_channels: [128, 128, 128]  # FPN upsample output channels
+  head_feat_channels: 384               # Feature channels after FPN concat
+
+anchors:
+  Car:
+    sizes: [[3.9, 1.6, 1.56]]          # [l, w, h] in meters
+    rotations: [0, 1.5707963]           # 0 and pi/2
+    center_z: -1.78
+    iou_thr_pos: 0.6
+    iou_thr_neg: 0.45
+    num_anchors_per_loc: 2
+  Pedestrian:
+    sizes: [[0.8, 0.6, 1.73]]
+    rotations: [0, 1.5707963]
+    center_z: -0.6
+    iou_thr_pos: 0.5
+    iou_thr_neg: 0.35
+    num_anchors_per_loc: 2
+  Cyclist:
+    sizes: [[1.76, 0.6, 1.73]]
+    rotations: [0, 1.5707963]
+    center_z: -0.6
+    iou_thr_pos: 0.5
+    iou_thr_neg: 0.35
+    num_anchors_per_loc: 2
+
+loss:
+  cls_weight: 1.0
+  reg_weight: 2.0
+  dir_weight: 0.2
+  focal_alpha: 0.25
+  focal_gamma: 2.0
+  smooth_l1_beta: 0.1111  # 1/9
+
+nms:
+  score_threshold: 0.4
+  iou_threshold: 0.5
+  max_predictions: 500
+
+training:
+  batch_size: 4
+  lr: 2.0e-4
+  weight_decay: 0.01
+  epochs: 160
+  lr_decay_epochs: [100, 140]
+  lr_decay_factor: 0.1
+  gradient_clip: 35.0
+  seed: 0
+  device: cuda
+  num_workers: 4
+  checkpoint_every: 5
+  eval_every: 5
+
+data:
+  root_dir: "data/KITTI"
+  train_split: "train"
+  val_split: "val"
+
+checkpoints:
+  save_dir: "checkpoints/"
+  best_model_path: "checkpoints/pointpillars_best.pt"
+
+logging:
+  log_every: 50
