@@ -130,6 +130,17 @@ python -m eval.kitti_eval \
 
 *Results with the default 160-epoch training on the 3712/3769 train/val split.*
 
+### How metrics are computed
+
+`eval/kitti_eval.py` performs the standard KITTI 3D detection evaluation:
+
+- **3D IoU**: pairwise IoU between predicted and ground-truth 3D boxes (oriented BEV intersection × height overlap).
+- **AP per class / difficulty (Easy/Moderate/Hard)**: 11-point or 40-point interpolated precision-recall AUC. A prediction is a TP if 3D IoU ≥ class threshold (Car 0.70, Pedestrian/Cyclist 0.50) and class matches; otherwise FP. Unmatched ground truths are FN.
+- **Precision-recall curves**: thresholds the score, sweeps recall, integrates precision; emitted as JSON for plotting.
+- **mAP**: arithmetic mean of class APs at the moderate difficulty band.
+
+The harness consumes the `val.txt` split and the checkpoint passed via `--checkpoint`; output is written to `eval/results/` as both a markdown table and JSON.
+
 ## ONNX Export
 
 ```bash
