@@ -4,39 +4,48 @@ PointPillars 3D object detection on the KITTI dataset. Includes a full Python tr
 
 ## Architecture
 
+```mermaid
+flowchart TB
+    bin["KITTI velodyne .bin<br/>N x 4 points: x, y, z, intensity"]
+
+    subgraph py["Training and export (Python)"]
+        dsl["data/kitti_dataset.py<br/>read_velodyne_bin, read_label_file,<br/>KITTIDataset, collate_fn"]
+        vox["data/voxelization.py Voxelizer<br/>assign points to pillars,<br/>truncate to P points, build V x P x 9 features"]
+        pfn["models/pillar_feature_net.py<br/>per-pillar PointNet: Linear, BN, ReLU, max pool<br/>then scatter to a B x 64 x H x W BEV canvas"]
+        bb["models/backbone_2d.py BackboneNeck<br/>3 stride-2 blocks plus FPN neck"]
+        head["models/detection_head.py AnchorHead<br/>classification, box regression, direction"]
+        loss["PointPillars.loss<br/>focal cls + smooth-L1 reg + direction<br/>weights 1.0 / 2.0 / 0.2, BEV IoU anchor assignment"]
+        tr["scripts/train.py"]
+        ev["eval/kitti_eval.py<br/>3D IoU, AP by class and difficulty"]
+        exp["scripts/export_onnx.py"]
+    end
+
+    onnx["model.onnx<br/>inputs: voxels, coords, num_points"]
+
+    subgraph cpp["Deployment (C++ / ONNX Runtime)"]
+        cvox["inference/cpp/voxelizer.cpp<br/>same pillar layout, hand written"]
+        sess["Ort::Session Run"]
+        dec["decodePredictions<br/>anchor decode plus score threshold"]
+        nms["nms at IoU 0.5"]
+        outb["boxes, scores, class ids"]
+    end
+
+    cfg["configs/pointpillars.yaml<br/>voxel size, point cloud range, anchors"]
+
+    bin --> dsl --> vox --> pfn --> bb --> head
+    head --> loss --> tr
+    tr -->|"checkpoint"| ev
+    tr -->|"checkpoint"| exp --> onnx
+    cfg -.-> vox
+    cfg -.-> head
+    cfg -.-> cvox
+    bin --> cvox --> sess
+    onnx --> sess --> dec --> nms --> outb
 ```
-┌────────────────��────────────────────────────────────────────────┐
-│                     PointPillars Architecture                   │
-│                                                                 │
-│  Point Cloud (N×4)                                              │
-│       │                                                         │
-│       ▼                                                         │
-│  ┌──────────────┐                                               │
-│  │  Voxelizer   │  Assign points to pillars, truncate to P pts  │
-│  │  (NumPy/C++) │  Output: (V, P, 9) pillar features            │
-│  └──────┬───────┘                                               │
-│         │                                                       │
-│         ▼                                                       │
-│  ┌──────────────┐                                               │
-│  │ PillarFeature│  Per-pillar PointNet (Linear→BN→ReLU→MaxPool) │
-│  │ Net (PyTorch)│  + Scatter to BEV: (B, 64, H, W)             │
-│  └──────┬───────┘                                               │
-│         │                                                       │
-│         ▼                                                       │
-│  ┌──────────────┐                                               │
-│  │ 2D Backbone  │  3 stride-2 blocks + FPN neck                 │
-│  │ + FPN Neck   │  Output: (B, 384, H/2, W/2)                   │
-│  └──────┬───────┘                                               │
-│         │                                                       │
-│         ▼                                                       │
-│  ┌──────────────┐                                               │
-│  │  AnchorHead  │  cls + box + direction heads                  │
-│  └──────┬───────┘                                               │
-│         │                                                       │
-│         ▼                                                       │
-│  Detections: (boxes, scores, class_ids)                         │
-└─────────────────────────────────────────────────────────────────┘
-```
+
+The C++ path re-implements voxelization from scratch so the deployed binary has
+no Python dependency; the ONNX graph starts at the pillar feature net, which is
+why voxels, coordinates and per-pillar point counts are all graph inputs.
 
 ## Project Structure
 
